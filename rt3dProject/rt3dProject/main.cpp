@@ -45,6 +45,8 @@ glm::vec3 eye(0.0f, 1.0f, 0.0f);
 glm::vec3 at(0.0f, 1.0f, -1.0f);
 glm::vec3 up(0.0f, 1.0f, 0.0f);
 
+glm::vec3 playerPos(0.0f, 0.0f, 0.0f);
+
 stack<glm::mat4> mvStack;
 
 // TEXTURE STUFF
@@ -201,10 +203,16 @@ glm::vec3 moveRight(glm::vec3 pos, GLfloat angle, GLfloat d) {
 
 void update(void) {
 	const Uint8 *keys = SDL_GetKeyboardState(NULL);
-	if (keys[SDL_SCANCODE_W]) eye = moveForward(eye, r, 0.1f);
+	/*if (keys[SDL_SCANCODE_W]) eye = moveForward(eye, r, 0.1f);
 	if (keys[SDL_SCANCODE_S]) eye = moveForward(eye, r, -0.1f);
 	if (keys[SDL_SCANCODE_A]) eye = moveRight(eye, r, -0.1f);
-	if (keys[SDL_SCANCODE_D]) eye = moveRight(eye, r, 0.1f);
+	if (keys[SDL_SCANCODE_D]) eye = moveRight(eye, r, 0.1f);*/
+
+	if (keys[SDL_SCANCODE_W]) playerPos = moveForward(playerPos, r, 0.1f);
+	if (keys[SDL_SCANCODE_S]) playerPos = moveForward(playerPos, r, -0.1f);
+	if (keys[SDL_SCANCODE_A]) playerPos = moveRight(playerPos, r, -0.1f);
+	if (keys[SDL_SCANCODE_D]) playerPos = moveRight(playerPos, r, 0.1f);
+
 	if (keys[SDL_SCANCODE_R]) eye.y += 0.1;
 	if (keys[SDL_SCANCODE_F]) eye.y -= 0.1;
 
@@ -280,7 +288,7 @@ void draw(SDL_Window * window) {
 	glm::mat4 modelview(1.0); // set base position for scene
 	mvStack.push(modelview);
 
-	at = moveForward(eye, r, 1.0f);
+	at = moveForward(playerPos, r, 1.0f);
 	mvStack.top() = glm::lookAt(eye, at, up);
 
 
@@ -372,11 +380,12 @@ void draw(SDL_Window * window) {
 	rt3d::materialStruct tmpMaterial = material1;
 	rt3d::setMaterial(shaderProgram, tmpMaterial);
 	mvStack.push(mvStack.top());
-	mvStack.top() = glm::translate(mvStack.top(), glm::vec3(1.0f, 1.2f, -5.0f));
+	mvStack.top() = glm::translate(mvStack.top(), playerPos);
 	mvStack.top() = glm::rotate(mvStack.top(), float(90.0f*DEG_TO_RADIAN), glm::vec3(-1.0f, 0.0f, 0.0f));
 	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(scale*0.05, scale*0.05, scale*0.05));
 	rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mvStack.top()));
 	rt3d::drawMesh(meshObjects[1], md2VertCount, GL_TRIANGLES);
+
 	mvStack.pop();
 	glCullFace(GL_BACK);
 
