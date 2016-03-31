@@ -24,7 +24,7 @@ void main(void) {
 
 	// surface normal in eye coordinates
 	// taking the rotation part of the modelview matrix to generate the normal matrix
-	// (if scaling is included, should use transpose inverse modelview matrix!)
+	// (if scaling is includes, should use transpose inverse modelview matrix!)
 	// this is somewhat wasteful in compute time and should really be part of the cpu program,
 	// giving an additional uniform input
 	mat3 normalmatrix = transpose(inverse(mat3(modelview)));
