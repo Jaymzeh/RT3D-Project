@@ -45,7 +45,7 @@ glm::vec3 eye(0.0f, 1.0f, 0.0f);
 glm::vec3 at(0.0f, 1.0f, -1.0f);
 glm::vec3 up(0.0f, 1.0f, 0.0f);
 
-glm::vec3 playerPos(0.0f, 0.0f, 0.0f);
+glm::vec3 playerPos(0.0f, 1.0f, 0.0f);
 
 stack<glm::mat4> mvStack;
 
@@ -213,8 +213,8 @@ void update(void) {
 	if (keys[SDL_SCANCODE_A]) playerPos = moveRight(playerPos, r, -0.1f);
 	if (keys[SDL_SCANCODE_D]) playerPos = moveRight(playerPos, r, 0.1f);
 
-	if (keys[SDL_SCANCODE_R]) eye.y += 0.1;
-	if (keys[SDL_SCANCODE_F]) eye.y -= 0.1;
+	if (keys[SDL_SCANCODE_R]) playerPos.y += 0.1;
+	if (keys[SDL_SCANCODE_F]) playerPos.y -= 0.1;
 
 	if (keys[SDL_SCANCODE_COMMA]) r -= 1.0f;
 	if (keys[SDL_SCANCODE_PERIOD]) r += 1.0f;
@@ -288,7 +288,10 @@ void draw(SDL_Window * window) {
 	glm::mat4 modelview(1.0); // set base position for scene
 	mvStack.push(modelview);
 
-	at = moveForward(playerPos, r, 1.0f);
+	eye = playerPos;
+	at = playerPos;
+	eye = moveForward(at, r, -6.0f);
+	eye.y = at.y + 3.0f;
 	mvStack.top() = glm::lookAt(eye, at, up);
 
 
@@ -382,6 +385,7 @@ void draw(SDL_Window * window) {
 	mvStack.push(mvStack.top());
 	mvStack.top() = glm::translate(mvStack.top(), playerPos);
 	mvStack.top() = glm::rotate(mvStack.top(), float(90.0f*DEG_TO_RADIAN), glm::vec3(-1.0f, 0.0f, 0.0f));
+	mvStack.top() = glm::rotate(mvStack.top(), -float((r - 90)*DEG_TO_RADIAN), glm::vec3(0.0f, 0.0f, 1.0f));
 	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(scale*0.05, scale*0.05, scale*0.05));
 	rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mvStack.top()));
 	rt3d::drawMesh(meshObjects[1], md2VertCount, GL_TRIANGLES);
@@ -418,7 +422,7 @@ void draw(SDL_Window * window) {
 	glBindTexture(GL_TEXTURE_2D, labels[0]);
 	mvStack.push(glm::mat4(1.0));
 	mvStack.top() = glm::translate(mvStack.top(), glm::vec3(-0.8f, 0.8f, 0.0f));
-	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(0.20f, 0.2f, 0.0f));
+	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(0.40f, 0.4f, 0.0f));
 	rt3d::setUniformMatrix4fv(skyboxProgram, "projection", glm::value_ptr(glm::mat4(1.0)));
 	rt3d::setUniformMatrix4fv(skyboxProgram, "modelview", glm::value_ptr(mvStack.top()));
 
