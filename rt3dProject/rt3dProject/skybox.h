@@ -6,6 +6,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <vector>
+#include <stack>
 using namespace std;
 
 class Skybox {
@@ -21,7 +22,7 @@ public:
 
 	void setTexture(Side side, char* fileName);
 
-	void drawSide(GLuint shaderProgram, Side side, glm::mat4 mat4);
+	void draw(GLuint shaderProgram, glm::mat4 projection, ::stack<glm::mat4>& mvStack);
 
 private:
 

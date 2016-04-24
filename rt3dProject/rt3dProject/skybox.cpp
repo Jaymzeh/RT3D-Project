@@ -26,11 +26,30 @@ void Skybox::setTexture(Side side, char* fileName) {
 	texture[side] = rt3d::loadBitmap(fileName);
 }
 
-void Skybox::drawSide(GLuint shaderProgram, Side side, glm::mat4 mat4) {
+void Skybox::draw(GLuint shaderProgram, glm::mat4 projection, ::stack<glm::mat4>& mvStack) {
 
-	glBindTexture(GL_TEXTURE_2D, texture[side]);
+	glUseProgram(shaderProgram);
+	rt3d::setUniformMatrix4fv(shaderProgram, "projection", glm::value_ptr(projection));
+
+	glDepthMask(GL_FALSE);
+	glm::mat3 mvRotOnlyMat3 = glm::mat3(mvStack.top());
+	mvStack.push(glm::mat4(mvRotOnlyMat3));
+
+	for (int i = 0; i < SDL_arraysize(texture); i++) {
+		mvStack.push(mvStack.top());
+		glBindTexture(GL_TEXTURE_2D, texture[i]);
+		mvStack.top() = glm::scale(mvStack.top(), scale);
+		mvStack.top() = glm::translate(mvStack.top(), pos[i]);
+		rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mvStack.top()));
+		rt3d::drawIndexedMesh(mesh, meshIndexCount, GL_TRIANGLES);
+		mvStack.pop();
+	}
+	mvStack.pop();
+	glDepthMask(GL_TRUE);
+
+	/*glBindTexture(GL_TEXTURE_2D, texture[side]);
 	mat4 = glm::scale(mat4, scale);
 	mat4 = glm::translate(mat4, pos[side]);
 	rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mat4));
-	rt3d::drawIndexedMesh(mesh, meshIndexCount, GL_TRIANGLES);
+	rt3d::drawIndexedMesh(mesh, meshIndexCount, GL_TRIANGLES);*/
 }

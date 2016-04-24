@@ -50,7 +50,6 @@ stack<glm::mat4> mvStack;
 
 // TEXTURE STUFF
 GLuint textures[2];
-GLuint skybox[5];
 GLuint labels[5];
 
 rt3d::lightStruct light0 = {
@@ -133,17 +132,11 @@ void init(void) {
 	meshObjects[1] = tmpModel.ReadMD2Model("tris.MD2");
 	md2VertCount = tmpModel.getVertDataCount();
 
-	skybox[0] = rt3d::loadBitmap("Town-skybox/Town_ft.bmp");
-	skybox[1] = rt3d::loadBitmap("Town-skybox/Town_bk.bmp");
-	skybox[2] = rt3d::loadBitmap("Town-skybox/Town_lf.bmp");
-	skybox[3] = rt3d::loadBitmap("Town-skybox/Town_rt.bmp");
-	//skybox[4] = loadBitmap("Town-skybox/Town_up.bmp");
 
 
-
-	model = Model("tris.MD2", "hobgoblin2.bmp");
+	//model = Model("tris.MD2", "hobgoblin2.bmp");
 	
-	model.scale = { 0.1f, 0.1f, 0.1f };
+	//model.scale = { 0.1f, 0.1f, 0.1f };
 
 	newSkybox = Skybox("cube.obj");
 	newSkybox.setTexture(Skybox::Side::FRONT, "Town-skybox/Town_ft.bmp");
@@ -268,35 +261,36 @@ void draw(SDL_Window * window) {
 	eye.y = at.y + 3.0f;
 	mvStack.top() = glm::lookAt(eye, at, up);
 
+	newSkybox.draw(skyboxProgram, projection, mvStack);
 
-	// draw a skybox
-	glUseProgram(skyboxProgram);
-	rt3d::setUniformMatrix4fv(skyboxProgram, "projection", glm::value_ptr(projection));
+	//// draw a skybox
+	//glUseProgram(skyboxProgram);
+	//rt3d::setUniformMatrix4fv(skyboxProgram, "projection", glm::value_ptr(projection));
 
-	glDepthMask(GL_FALSE); // make sure depth test is off
-	glm::mat3 mvRotOnlyMat3 = glm::mat3(mvStack.top());
-	mvStack.push(glm::mat4(mvRotOnlyMat3));
+	//glDepthMask(GL_FALSE); // make sure depth test is off
+	//glm::mat3 mvRotOnlyMat3 = glm::mat3(mvStack.top());
+	//mvStack.push(glm::mat4(mvRotOnlyMat3));
 
-	mvStack.push(mvStack.top());
-	newSkybox.drawSide(skyboxProgram, Skybox::Side::FRONT, mvStack.top());
-	mvStack.pop();
+	//mvStack.push(mvStack.top());
+	//newSkybox.drawSide(skyboxProgram, Skybox::Side::FRONT, mvStack.top());
+	//mvStack.pop();
 
-	mvStack.push(mvStack.top());
-	newSkybox.drawSide(skyboxProgram, Skybox::Side::BACK, mvStack.top());
-	mvStack.pop();
+	//mvStack.push(mvStack.top());
+	//newSkybox.drawSide(skyboxProgram, Skybox::Side::BACK, mvStack.top());
+	//mvStack.pop();
 
-	mvStack.push(mvStack.top());
-	newSkybox.drawSide(skyboxProgram, Skybox::Side::LEFT, mvStack.top());
-	mvStack.pop();
+	//mvStack.push(mvStack.top());
+	//newSkybox.drawSide(skyboxProgram, Skybox::Side::LEFT, mvStack.top());
+	//mvStack.pop();
 
-	mvStack.push(mvStack.top());
-	newSkybox.drawSide(skyboxProgram, Skybox::Side::RIGHT, mvStack.top());
-	mvStack.pop();
+	//mvStack.push(mvStack.top());
+	//newSkybox.drawSide(skyboxProgram, Skybox::Side::RIGHT, mvStack.top());
+	//mvStack.pop();
 
-	mvStack.pop();
+	//mvStack.pop();
 
-	// back to remainder of rendering
-	glDepthMask(GL_TRUE); // make sure depth test is on
+	//// back to remainder of rendering
+	//glDepthMask(GL_TRUE); // make sure depth test is on
 
 	glUseProgram(shaderProgram);
 
