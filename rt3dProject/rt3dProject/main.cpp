@@ -21,6 +21,7 @@
 using namespace std;
 
 #include "model.h"
+#include "skybox.h"
 
 TTF_Font * textFont;
 
@@ -78,6 +79,7 @@ md2model tmpModel;
 int currentAnim = 0;
 
 Model model;
+Skybox newSkybox;
 
 // Set up rendering context
 SDL_Window * setupRC(SDL_GLContext &context) {
@@ -107,45 +109,6 @@ SDL_Window * setupRC(SDL_GLContext &context) {
 	return window;
 }
 
-// A simple texture loading function
-// lots of room for improvement - and better error checking!
-GLuint loadBitmap(char *fname) {
-	GLuint texID;
-	glGenTextures(1, &texID); // generate texture ID
-
-							  // load file - using core SDL library
-	SDL_Surface *tmpSurface;
-	tmpSurface = SDL_LoadBMP(fname);
-	if (!tmpSurface) {
-		std::cout << "Error loading bitmap" << std::endl;
-	}
-
-	// bind texture and set parameters
-	glBindTexture(GL_TEXTURE_2D, texID);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	SDL_PixelFormat *format = tmpSurface->format;
-
-	GLuint externalFormat, internalFormat;
-	if (format->Amask) {
-		internalFormat = GL_RGBA;
-		externalFormat = (format->Rmask < format->Bmask) ? GL_RGBA : GL_BGRA;
-	}
-	else {
-		internalFormat = GL_RGB;
-		externalFormat = (format->Rmask < format->Bmask) ? GL_RGB : GL_BGR;
-	}
-
-	glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, tmpSurface->w, tmpSurface->h, 0,
-		externalFormat, GL_UNSIGNED_BYTE, tmpSurface->pixels);
-	glGenerateMipmap(GL_TEXTURE_2D);
-
-	SDL_FreeSurface(tmpSurface); // texture loaded, free the temporary buffer
-	return texID;	// return value of texture ID
-}
 
 
 void init(void) {
@@ -163,17 +126,17 @@ void init(void) {
 	rt3d::loadObj("cube.obj", verts, norms, tex_coords, indices);
 	GLuint size = indices.size();
 	meshIndexCount = size;
-	textures[0] = loadBitmap("fabric.bmp");
+	textures[0] = rt3d::loadBitmap("fabric.bmp");
 	meshObjects[0] = rt3d::createMesh(verts.size() / 3, verts.data(), nullptr, norms.data(), tex_coords.data(), size, indices.data());
 
-	textures[1] = loadBitmap("hobgoblin2.bmp");
+	textures[1] = rt3d::loadBitmap("hobgoblin2.bmp");
 	meshObjects[1] = tmpModel.ReadMD2Model("tris.MD2");
 	md2VertCount = tmpModel.getVertDataCount();
 
-	skybox[0] = loadBitmap("Town-skybox/Town_ft.bmp");
-	skybox[1] = loadBitmap("Town-skybox/Town_bk.bmp");
-	skybox[2] = loadBitmap("Town-skybox/Town_lf.bmp");
-	skybox[3] = loadBitmap("Town-skybox/Town_rt.bmp");
+	skybox[0] = rt3d::loadBitmap("Town-skybox/Town_ft.bmp");
+	skybox[1] = rt3d::loadBitmap("Town-skybox/Town_bk.bmp");
+	skybox[2] = rt3d::loadBitmap("Town-skybox/Town_lf.bmp");
+	skybox[3] = rt3d::loadBitmap("Town-skybox/Town_rt.bmp");
 	//skybox[4] = loadBitmap("Town-skybox/Town_up.bmp");
 
 
@@ -182,7 +145,11 @@ void init(void) {
 	
 	model.scale = { 0.1f, 0.1f, 0.1f };
 
-
+	newSkybox = Skybox("cube.obj");
+	newSkybox.setTexture(Skybox::Side::FRONT, "Town-skybox/Town_ft.bmp");
+	newSkybox.setTexture(Skybox::Side::BACK, "Town-skybox/Town_bk.bmp");
+	newSkybox.setTexture(Skybox::Side::LEFT, "Town-skybox/Town_lf.bmp");
+	newSkybox.setTexture(Skybox::Side::RIGHT, "Town-skybox/Town_rt.bmp");
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
@@ -310,42 +277,21 @@ void draw(SDL_Window * window) {
 	glm::mat3 mvRotOnlyMat3 = glm::mat3(mvStack.top());
 	mvStack.push(glm::mat4(mvRotOnlyMat3));
 
-	// front
 	mvStack.push(mvStack.top());
-	glBindTexture(GL_TEXTURE_2D, skybox[0]);
-	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(2.0f, 2.0f, 2.0f));
-	mvStack.top() = glm::translate(mvStack.top(), glm::vec3(0.0f, 0.0f, -2.0f));
-	rt3d::setUniformMatrix4fv(skyboxProgram, "modelview", glm::value_ptr(mvStack.top()));
-	rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
+	newSkybox.drawSide(skyboxProgram, Skybox::Side::FRONT, mvStack.top());
 	mvStack.pop();
 
-	// back
 	mvStack.push(mvStack.top());
-	glBindTexture(GL_TEXTURE_2D, skybox[1]);
-	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(2.0f, 2.0f, 2.0f));
-	mvStack.top() = glm::translate(mvStack.top(), glm::vec3(0.0f, 0.0f, 2.0f));
-	rt3d::setUniformMatrix4fv(skyboxProgram, "modelview", glm::value_ptr(mvStack.top()));
-	rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
+	newSkybox.drawSide(skyboxProgram, Skybox::Side::BACK, mvStack.top());
 	mvStack.pop();
 
-	// left
 	mvStack.push(mvStack.top());
-	glBindTexture(GL_TEXTURE_2D, skybox[2]);
-	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(2.0f, 2.0f, 2.0f));
-	mvStack.top() = glm::translate(mvStack.top(), glm::vec3(-2.0f, 0.0f, 0.0f));
-	rt3d::setUniformMatrix4fv(skyboxProgram, "modelview", glm::value_ptr(mvStack.top()));
-	rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
+	newSkybox.drawSide(skyboxProgram, Skybox::Side::LEFT, mvStack.top());
 	mvStack.pop();
 
-	// right
 	mvStack.push(mvStack.top());
-	glBindTexture(GL_TEXTURE_2D, skybox[3]);
-	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(2.0f, 2.0f, 2.0f));
-	mvStack.top() = glm::translate(mvStack.top(), glm::vec3(2.0f, 0.0f, 0.0f));
-	rt3d::setUniformMatrix4fv(skyboxProgram, "modelview", glm::value_ptr(mvStack.top()));
-	rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
+	newSkybox.drawSide(skyboxProgram, Skybox::Side::RIGHT, mvStack.top());
 	mvStack.pop();
-
 
 	mvStack.pop();
 
@@ -399,10 +345,10 @@ void draw(SDL_Window * window) {
 	glCullFace(GL_BACK);
 
 
-	mvStack.push(mvStack.top());
-	model.update();
-	model.draw(shaderProgram, mvStack.top());
-	mvStack.pop();
+	//mvStack.push(mvStack.top());
+	//model.update();
+	//model.draw(shaderProgram, mvStack.top());
+	//mvStack.pop();
 
 
 

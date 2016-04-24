@@ -3,8 +3,6 @@
 #include "md2model.h"
 #include <glm\glm.hpp>
 
-#include <stack>
-
 class Model {
 
 public:
