@@ -1,5 +1,4 @@
-#ifndef RT3D
-#define RT3D
+#pragma once
 
 #include <GL/glew.h>
 #include <SDL.h>
@@ -11,6 +10,8 @@
 #pragma warning(disable : 4005)
 #pragma warning(disable : 4101)
 #pragma warning(disable : 4018)
+
+#define DEG_TO_RADIAN 0.017453293
 
 #define RT3D_VERTEX		0
 #define RT3D_COLOUR		1
@@ -36,6 +37,7 @@ namespace rt3d {
 
 	void exitFatalError(const char *message);
 	char* loadFile(const char *fname, GLint &fSize);
+	GLuint loadBitmap(char *fname);
 	void printShaderError(const GLint shader);
 	GLuint initShaders(const char *vertFile, const char *fragFile);
 	// Some methods for creating meshes
@@ -59,5 +61,3 @@ namespace rt3d {
 
 	void updateMesh(const GLuint mesh, const unsigned int bufferType, const GLfloat *data, const GLuint size);
 }
-
-#endif

@@ -19,15 +19,13 @@
 #include <SDL_ttf.h>
 
 using namespace std;
-#define DEG_TO_RADIAN 0.017453293
 
+#include "model.h"
 
 TTF_Font * textFont;
 
 GLuint textToTexture(const char * str/*, TTF_Font *font, SDL_Color colour, GLuint &w,GLuint &h */);
 
-
-#define DEG_TO_RADIAN 0.017453293
 
 // Globals
 // Real programs don't use globals :-D
@@ -79,6 +77,7 @@ rt3d::materialStruct material1 = {
 md2model tmpModel;
 int currentAnim = 0;
 
+Model model;
 
 // Set up rendering context
 SDL_Window * setupRC(SDL_GLContext &context) {
@@ -177,6 +176,14 @@ void init(void) {
 	skybox[3] = loadBitmap("Town-skybox/Town_rt.bmp");
 	//skybox[4] = loadBitmap("Town-skybox/Town_up.bmp");
 
+
+
+	model = Model("tris.MD2", "hobgoblin2.bmp");
+	
+	model.scale = { 0.1f, 0.1f, 0.1f };
+
+
+
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -194,11 +201,11 @@ void init(void) {
 }
 
 glm::vec3 moveForward(glm::vec3 pos, GLfloat angle, GLfloat d) {
-	return glm::vec3(pos.x + d*std::sin(r*DEG_TO_RADIAN), pos.y, pos.z - d*std::cos(r*DEG_TO_RADIAN));
+	return glm::vec3(pos.x + d*std::sin(angle*DEG_TO_RADIAN), pos.y, pos.z - d*std::cos(angle*DEG_TO_RADIAN));
 }
 
 glm::vec3 moveRight(glm::vec3 pos, GLfloat angle, GLfloat d) {
-	return glm::vec3(pos.x + d*std::cos(r*DEG_TO_RADIAN), pos.y, pos.z + d*std::sin(r*DEG_TO_RADIAN));
+	return glm::vec3(pos.x + d*std::cos(angle*DEG_TO_RADIAN), pos.y, pos.z + d*std::sin(angle*DEG_TO_RADIAN));
 }
 
 void update(void) {
@@ -208,16 +215,16 @@ void update(void) {
 	if (keys[SDL_SCANCODE_A]) eye = moveRight(eye, r, -0.1f);
 	if (keys[SDL_SCANCODE_D]) eye = moveRight(eye, r, 0.1f);*/
 
-	if (keys[SDL_SCANCODE_W]) playerPos = moveForward(playerPos, r, 0.1f);
-	if (keys[SDL_SCANCODE_S]) playerPos = moveForward(playerPos, r, -0.1f);
-	if (keys[SDL_SCANCODE_A]) playerPos = moveRight(playerPos, r, -0.1f);
-	if (keys[SDL_SCANCODE_D]) playerPos = moveRight(playerPos, r, 0.1f);
+	if (keys[SDL_SCANCODE_W]) model.pos = moveForward(model.pos, model.rot.z, 0.1f);
+	if (keys[SDL_SCANCODE_S]) model.pos = moveForward(model.pos, model.rot.z, -0.1f);
+	if (keys[SDL_SCANCODE_A]) model.pos = moveRight(model.pos, model.rot.z, -0.1f);
+	if (keys[SDL_SCANCODE_D]) model.pos = moveRight(model.pos, model.rot.z, 0.1f);
 
-	if (keys[SDL_SCANCODE_R]) playerPos.y += 0.1;
-	if (keys[SDL_SCANCODE_F]) playerPos.y -= 0.1;
+	if (keys[SDL_SCANCODE_R]) model.pos.y += 0.1;
+	if (keys[SDL_SCANCODE_F]) model.pos.y -= 0.1;
 
-	if (keys[SDL_SCANCODE_COMMA]) r -= 1.0f;
-	if (keys[SDL_SCANCODE_PERIOD]) r += 1.0f;
+	if (keys[SDL_SCANCODE_COMMA]) model.rot.z -= 1.0f;
+	if (keys[SDL_SCANCODE_PERIOD]) model.rot.z += 1.0f;
 
 	if (keys[SDL_SCANCODE_1]) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -288,9 +295,9 @@ void draw(SDL_Window * window) {
 	glm::mat4 modelview(1.0); // set base position for scene
 	mvStack.push(modelview);
 
-	eye = playerPos;
-	at = playerPos;
-	eye = moveForward(at, r, -6.0f);
+	eye = model.pos;
+	at = model.pos;
+	eye = moveForward(at, model.rot.z, -6.0f);
 	eye.y = at.y + 3.0f;
 	mvStack.top() = glm::lookAt(eye, at, up);
 
@@ -370,9 +377,6 @@ void draw(SDL_Window * window) {
 
 
 
-
-
-
 	// Animate the md2 model, and update the mesh with new vertex data
 	tmpModel.Animate(currentAnim, 0.1);
 	rt3d::updateMesh(meshObjects[1], RT3D_VERTEX, tmpModel.getAnimVerts(), tmpModel.getVertDataSize());
@@ -382,6 +386,7 @@ void draw(SDL_Window * window) {
 	glBindTexture(GL_TEXTURE_2D, textures[1]);
 	rt3d::materialStruct tmpMaterial = material1;
 	rt3d::setMaterial(shaderProgram, tmpMaterial);
+
 	mvStack.push(mvStack.top());
 	mvStack.top() = glm::translate(mvStack.top(), playerPos);
 	mvStack.top() = glm::rotate(mvStack.top(), float(90.0f*DEG_TO_RADIAN), glm::vec3(-1.0f, 0.0f, 0.0f));
@@ -392,6 +397,12 @@ void draw(SDL_Window * window) {
 
 	mvStack.pop();
 	glCullFace(GL_BACK);
+
+
+	mvStack.push(mvStack.top());
+	model.update();
+	model.draw(shaderProgram, mvStack.top());
+	mvStack.pop();
 
 
 
@@ -478,4 +489,3 @@ int main(int argc, char *argv[]) {
 	SDL_Quit();
 	return 0;
 }
-
