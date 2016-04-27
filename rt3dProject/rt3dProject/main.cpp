@@ -16,6 +16,7 @@
 #include <stack>
 #include "md2model.h"
 #include "model.h"
+#include "bass.h"
 
 #include <SDL_ttf.h>
 
@@ -45,11 +46,13 @@ glm::vec3 at(0.0f, 1.0f, -1.0f);
 glm::vec3 up(0.0f, 1.0f, 0.0f);
 
 glm::vec3 playerPos(0.0f, 1.0f, 0.0f);
+glm::vec3 oldPlayerPos(0.0f, 1.0f, 0.0f);
+glm::vec3 playerScale(0.05f, 0.05f, 0.05f);
 
 stack<glm::mat4> mvStack;
 
 // TEXTURE STUFF
-GLuint textures[2];
+GLuint textures[4];
 GLuint labels[5];
 
 rt3d::lightStruct light0 = {
@@ -77,8 +80,12 @@ rt3d::materialStruct material1 = {
 md2model tmpModel;
 int currentAnim = 0;
 
+HSAMPLE sample;
+HCHANNEL channel;
 
-Model ground;
+Model ground[2];
+Model building[10];
+
 Skybox newSkybox;
 
 // Set up rendering context
@@ -109,6 +116,16 @@ SDL_Window * setupRC(SDL_GLContext &context) {
 	return window;
 }
 
+HSAMPLE loadSample(char * filename) {
+	HSAMPLE sam;
+	if (sam = BASS_SampleLoad(FALSE, filename, 0, 0, 3, BASS_SAMPLE_OVER_POS))
+		cout << "sample " << filename << " loaded!" << endl;
+	else {
+		cout << "Can't load sample";
+		exit(0);
+	}
+	return sam;
+}
 
 
 void init(void) {
@@ -123,8 +140,60 @@ void init(void) {
 	meshObjects[1] = tmpModel.ReadMD2Model("tris.MD2");
 	md2VertCount = tmpModel.getVertDataCount();
 
-	ground = Model("cube.obj", "fabric.bmp");
-	ground.scale = { 20.0f, 0.1f, 20.0f };
+	vector<GLfloat> verts;
+	vector<GLfloat> norms;
+	vector<GLfloat> tex_coords;
+	vector<GLuint> indices;
+	rt3d::loadObj("cube.obj", verts, norms, tex_coords, indices);
+	GLuint size = indices.size();
+	meshIndexCount = size;
+	textures[0] = rt3d::loadBitmap("ground.bmp");
+	meshObjects[0] = rt3d::createMesh(verts.size() / 3, verts.data(), nullptr, norms.data(), tex_coords.data(), size, indices.data());
+
+	textures[2] = rt3d::loadBitmap("building.bmp");
+	textures[3] = rt3d::loadBitmap("fence.bmp");
+	//ground
+	ground[0].pos = { 0.0f, 0.0f, 0.0f };
+	ground[0].scale = { 20.0f, 0.2f, 20.0f };
+	ground[0].texture = textures[0];
+	
+	ground[1].pos = { 40.0f,0.0f ,10.0f };
+	ground[1].scale = { 20.0f,0.2f,10.0f };
+	ground[1].texture = textures[0];
+
+	//front
+	building[0].pos = { -10.0f, 2.0f, -21.0f };
+	building[0].scale = { 10.0f, 2.0f, 1.0f };
+	building[0].texture = textures[2];
+
+	building[1].pos = { 10.0f, 2.5f, -21.0f };
+	building[1].scale = { 10.0f, 2.5f, 1.0f };
+	building[1].texture = textures[2];
+
+	//left
+	building[2].pos = { -21.0f, 1.0f, 0.0f };
+	building[2].scale = { 1.0f, 1.0f, 20.0f };
+	building[2].texture = textures[3];
+
+	//back
+	building[3].pos = { 0.0f, 1.0f, 21.0f };
+	building[3].scale = { 20.0f, 1.0f, 1.0f };
+	building[3].texture = textures[3];
+
+	//front right
+	building[4].pos = { 40.0f, 3.0f, -10.0f };
+	building[4].scale = { 20.0f, 3.0f, 10.0f };
+	building[4].texture = textures[2];
+
+	//back right
+	building[5].pos = { 40.0f, 3.0f, 30.0f };
+	building[5].scale = { 20.0f, 3.0f, 10.0f };
+	building[5].texture = textures[2];
+
+	//right end wall
+	building[6].pos = { 60.0f, 5.0f, 10.0f };
+	building[6].scale = { 1.0f, 5.0f, 10.0f };
+	building[6].texture = textures[2];
 
 	newSkybox = Skybox("cube.obj");
 	newSkybox.setTexture(Skybox::Side::FRONT, "Town-skybox/Town_ft.bmp");
@@ -146,7 +215,19 @@ void init(void) {
 		cout << "Failed to open font." << endl;
 
 	labels[0] = 0;
+
+	if (!BASS_Init(-1, 44100, 0, 0, NULL))
+		cout << "Can't initialize device";
+
+	sample = loadSample("The Forgotten Age.mp3");
+
+	channel = BASS_SampleGetChannel(sample, FALSE);
+	BASS_ChannelSetAttribute(channel, BASS_ATTRIB_FREQ, 0);
+	BASS_ChannelSetAttribute(channel, BASS_ATTRIB_VOL, 0.5);
+	BASS_ChannelSetAttribute(channel, BASS_ATTRIB_PAN, -1);
+	BASS_ChannelPlay(channel, FALSE);
 }
+
 
 glm::vec3 moveForward(glm::vec3 pos, GLfloat angle, GLfloat d) {
 	return glm::vec3(pos.x + d*std::sin(angle*DEG_TO_RADIAN), pos.y, pos.z - d*std::cos(angle*DEG_TO_RADIAN));
@@ -158,15 +239,11 @@ glm::vec3 moveRight(glm::vec3 pos, GLfloat angle, GLfloat d) {
 
 void update(void) {
 	const Uint8 *keys = SDL_GetKeyboardState(NULL);
-	/*if (keys[SDL_SCANCODE_W]) eye = moveForward(eye, r, 0.1f);
-	if (keys[SDL_SCANCODE_S]) eye = moveForward(eye, r, -0.1f);
-	if (keys[SDL_SCANCODE_A]) eye = moveRight(eye, r, -0.1f);
-	if (keys[SDL_SCANCODE_D]) eye = moveRight(eye, r, 0.1f);*/
 
-	if (keys[SDL_SCANCODE_W]) playerPos = moveForward(playerPos, rot, 0.1f);
-	if (keys[SDL_SCANCODE_S]) playerPos = moveForward(playerPos, rot, -0.1f);
-	if (keys[SDL_SCANCODE_A]) playerPos = moveRight(playerPos, rot, -0.1f);
-	if (keys[SDL_SCANCODE_D]) playerPos = moveRight(playerPos, rot, 0.1f);
+	if (keys[SDL_SCANCODE_W]) playerPos = moveForward(playerPos, rot, 0.3f);
+	if (keys[SDL_SCANCODE_S]) playerPos = moveForward(playerPos, rot, -0.3f);
+	if (keys[SDL_SCANCODE_A]) playerPos = moveRight(playerPos, rot, -0.3f);
+	if (keys[SDL_SCANCODE_D]) playerPos = moveRight(playerPos, rot, 0.3f);
 
 	if (keys[SDL_SCANCODE_R]) playerPos.y += 0.1;
 	if (keys[SDL_SCANCODE_F]) playerPos.y -= 0.1;
@@ -192,6 +269,23 @@ void update(void) {
 	}
 }
 
+//AABB Collision
+void checkCollision(glm::vec3 boxA, glm::vec3 scaleA, glm::vec3 boxB, glm::vec3 scaleB) {
+	glm::vec3 tmp(boxA.x, boxA.y - 1.0f, boxA.z);
+	//check the X axis
+	if (abs(tmp.x - boxB.x) < scaleA.x + scaleB.x) {
+		//check the Y axis
+		if (abs(tmp.y - boxB.y) < scaleA.y + scaleB.y) {
+			//check the Z axis
+			if (abs(tmp.z - boxB.z) < scaleA.z + scaleB.z) {
+				
+				playerPos = oldPlayerPos;
+				
+				cout << "Collision detected MOFO!" << endl;
+			}
+		}
+	}
+}
 
 // textToTexture
 GLuint textToTexture(const char * str, GLuint textID) {
@@ -243,6 +337,8 @@ void draw(SDL_Window * window) {
 	glm::mat4 modelview(1.0); // set base position for scene
 	mvStack.push(modelview);
 
+	
+
 	eye = playerPos;
 	at = playerPos;
 	eye = moveForward(at, rot, -6.0f);
@@ -262,9 +358,56 @@ void draw(SDL_Window * window) {
 
 	rt3d::setUniformMatrix4fv(shaderProgram, "projection", glm::value_ptr(projection));
 
+	/*
+	
+	meshOne.oldPos = meshOne.pos;
+	meshTwo.oldPos = meshTwo.pos;
 
-	ground.draw(shaderProgram, mvStack);
+	checkCollision
+	
+	*/
 
+	for (int i = 0; i < 2; i++) {
+		glBindTexture(GL_TEXTURE_2D, ground[i].texture);
+		rt3d::materialStruct tmpMaterial = ground[i].material;
+		rt3d::setMaterial(shaderProgram, ground[i].material);
+
+		mvStack.push(mvStack.top());
+		mvStack.top() = glm::translate(mvStack.top(), ground[i].pos);
+		mvStack.top() = glm::rotate(mvStack.top(), float(ground[i].rot.x * DEG_TO_RADIAN), glm::vec3(-1.0f, 0.0f, 0.0f));
+		mvStack.top() = glm::rotate(mvStack.top(), -float((ground[i].rot.y)*DEG_TO_RADIAN), glm::vec3(0.0f, 1.0f, 0.0f));
+		mvStack.top() = glm::rotate(mvStack.top(), -float((ground[i].rot.z)*DEG_TO_RADIAN), glm::vec3(0.0f, 0.0f, 1.0f));
+
+		mvStack.top() = glm::scale(mvStack.top(), ground[i].scale);
+
+		rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mvStack.top()));
+		rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
+		mvStack.pop();
+
+		oldPlayerPos = { playerPos.x, playerPos.y, playerPos.z };
+		checkCollision(playerPos, playerScale, ground[i].pos, ground[i].scale);
+	}
+
+	for (int i = 0; i < 10; i++) {
+		glBindTexture(GL_TEXTURE_2D, building[i].texture);
+		rt3d::materialStruct tmpMaterial = building[i].material;
+		rt3d::setMaterial(shaderProgram, building[i].material);
+
+		mvStack.push(mvStack.top());
+		mvStack.top() = glm::translate(mvStack.top(), building[i].pos);
+		mvStack.top() = glm::rotate(mvStack.top(), float(building[i].rot.x * DEG_TO_RADIAN), glm::vec3(-1.0f, 0.0f, 0.0f));
+		mvStack.top() = glm::rotate(mvStack.top(), -float((building[i].rot.y)*DEG_TO_RADIAN), glm::vec3(0.0f, 1.0f, 0.0f));
+		mvStack.top() = glm::rotate(mvStack.top(), -float((building[i].rot.z)*DEG_TO_RADIAN), glm::vec3(0.0f, 0.0f, 1.0f));
+
+		mvStack.top() = glm::scale(mvStack.top(), building[i].scale);
+
+		rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mvStack.top()));
+		rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
+		mvStack.pop();
+
+		oldPlayerPos = { playerPos.x, playerPos.y, playerPos.z };
+		checkCollision(playerPos, playerScale, building[i].pos, building[i].scale);
+	}
 
 
 	// Animate the md2 model, and update the mesh with new vertex data
