@@ -4,6 +4,7 @@
 #include "md2model.h"
 #include <glm\glm.hpp>
 #include <vector>
+#include <stack>
 
 using namespace std;
 
@@ -16,13 +17,13 @@ public:
 	~Model();
 	Model(char* modelName, char* textureName);
 
-	void draw(GLuint shaderProgram, glm::mat4 mat4);
+	void draw(GLuint shaderProgram, stack<glm::mat4>& mvStack);
 
 	bool loadTexture(char* fileName);
 
 	glm::vec3 pos;
 	glm::vec3 rot;
-	glm::vec3 scale = { 0.05f, 0.05f, 0.05f };
+	glm::vec3 scale = { 1.0f, 1.0f, 1.0f };
 
 private:
 	GLuint mesh;

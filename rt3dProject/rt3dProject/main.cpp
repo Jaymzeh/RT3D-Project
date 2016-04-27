@@ -15,6 +15,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <stack>
 #include "md2model.h"
+#include "model.h"
 
 #include <SDL_ttf.h>
 
@@ -76,6 +77,8 @@ rt3d::materialStruct material1 = {
 md2model tmpModel;
 int currentAnim = 0;
 
+
+Model ground;
 Skybox newSkybox;
 
 // Set up rendering context
@@ -116,21 +119,12 @@ void init(void) {
 
 	skyboxProgram = rt3d::initShaders("textured.vert", "textured.frag");
 
-	vector<GLfloat> verts;
-	vector<GLfloat> norms;
-	vector<GLfloat> tex_coords;
-	vector<GLuint> indices;
-	rt3d::loadObj("cube.obj", verts, norms, tex_coords, indices);
-	GLuint size = indices.size();
-	meshIndexCount = size;
-	textures[0] = rt3d::loadBitmap("fabric.bmp");
-	meshObjects[0] = rt3d::createMesh(verts.size() / 3, verts.data(), nullptr, norms.data(), tex_coords.data(), size, indices.data());
-
 	textures[1] = rt3d::loadBitmap("hobgoblin2.bmp");
 	meshObjects[1] = tmpModel.ReadMD2Model("tris.MD2");
 	md2VertCount = tmpModel.getVertDataCount();
 
-
+	ground = Model("cube.obj", "fabric.bmp");
+	ground.scale = { 20.0f, 0.1f, 20.0f };
 
 	newSkybox = Skybox("cube.obj");
 	newSkybox.setTexture(Skybox::Side::FRONT, "Town-skybox/Town_ft.bmp");
@@ -269,16 +263,7 @@ void draw(SDL_Window * window) {
 	rt3d::setUniformMatrix4fv(shaderProgram, "projection", glm::value_ptr(projection));
 
 
-
-	// draw a cube for ground plane
-	glBindTexture(GL_TEXTURE_2D, textures[0]);
-	mvStack.push(mvStack.top());
-	mvStack.top() = glm::translate(mvStack.top(), glm::vec3(-10.0f, -0.1f, -10.0f));
-	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(20.0f, 0.1f, 20.0f));
-	rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mvStack.top()));
-	rt3d::setMaterial(shaderProgram, material0);
-	rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
-	mvStack.pop();
+	ground.draw(shaderProgram, mvStack);
 
 
 

@@ -26,7 +26,7 @@ void Skybox::setTexture(Side side, char* fileName) {
 	texture[side] = rt3d::loadBitmap(fileName);
 }
 
-void Skybox::draw(GLuint shaderProgram, glm::mat4 projection, ::stack<glm::mat4>& mvStack) {
+void Skybox::draw(GLuint shaderProgram, glm::mat4 projection, stack<glm::mat4>& mvStack) {
 
 	glUseProgram(shaderProgram);
 	rt3d::setUniformMatrix4fv(shaderProgram, "projection", glm::value_ptr(projection));
