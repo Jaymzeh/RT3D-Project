@@ -14,7 +14,7 @@ public:
 
 	GLuint texture;
 	rt3d::materialStruct material = {
-		{ 0.4f, 0.4f, 1.0f, 1.0f }, // ambient
+		{ 1.0f, 1.0f, 1.0f, 1.0f }, // ambient
 		{ 0.8f, 0.8f, 1.0f, 1.0f }, // diffuse
 		{ 0.8f, 0.8f, 0.8f, 1.0f }, // specular
 		1.0f  // shininess
