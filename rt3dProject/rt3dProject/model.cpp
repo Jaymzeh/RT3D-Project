@@ -1,25 +1,22 @@
 #include "model.h"
 
-Model::Model(char* modelName, char* textureName) {
-	texture = rt3d::loadBitmap(textureName);
-	mesh = tmpModel.ReadMD2Model(modelName);
-	md2VertCount = tmpModel.getVertDataCount();
 
-	rot.x = 90;
+Model::Model(char* modelName, char* textureName) {
+	vector<GLfloat> verts;
+	vector<GLfloat> norms;
+	vector<GLfloat> tex_coords;
+	vector<GLuint> indices;
+	rt3d::loadObj(modelName, verts, norms, tex_coords, indices);
+	GLuint size = indices.size();
+	meshIndexCount = size;
+
+	mesh = rt3d::createMesh(verts.size() / 3, verts.data(), nullptr, norms.data(), tex_coords.data(), size, indices.data());
 }
 Model::~Model() {
 	
 }
-void Model::update() {
-	tmpModel.Animate(currentAnim, 0.1);
-	rt3d::updateMesh(mesh, RT3D_VERTEX, tmpModel.getAnimVerts(), tmpModel.getVertDataSize());
-}
 
 void Model::draw(GLuint shaderProgram, glm::mat4 mat4) {
-
-	
-
-	glCullFace(GL_FRONT); // md2 faces are defined clockwise, so cull front face
 	glBindTexture(GL_TEXTURE_2D, texture);
 	rt3d::materialStruct tmpMaterial = material;
 	rt3d::setMaterial(shaderProgram, material);
@@ -33,8 +30,7 @@ void Model::draw(GLuint shaderProgram, glm::mat4 mat4) {
 	mat4 = glm::scale(mat4, scale);
 
 	rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mat4));
-	rt3d::drawMesh(mesh, md2VertCount, GL_TRIANGLES);
-	glCullFace(GL_BACK);
+	rt3d::drawIndexedMesh(mesh, meshIndexCount, GL_TRIANGLES);
 }
 
 bool Model::loadTexture(char* fileName) {

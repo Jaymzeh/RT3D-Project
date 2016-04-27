@@ -20,7 +20,6 @@
 
 using namespace std;
 
-#include "model.h"
 #include "skybox.h"
 
 TTF_Font * textFont;
@@ -38,7 +37,7 @@ GLuint meshObjects[2];
 GLuint shaderProgram;
 GLuint skyboxProgram;
 
-GLfloat r = 0.0f;
+GLfloat rot = 0.0f;
 
 glm::vec3 eye(0.0f, 1.0f, 0.0f);
 glm::vec3 at(0.0f, 1.0f, -1.0f);
@@ -77,7 +76,6 @@ rt3d::materialStruct material1 = {
 md2model tmpModel;
 int currentAnim = 0;
 
-Model model;
 Skybox newSkybox;
 
 // Set up rendering context
@@ -134,10 +132,6 @@ void init(void) {
 
 
 
-	//model = Model("tris.MD2", "hobgoblin2.bmp");
-	
-	//model.scale = { 0.1f, 0.1f, 0.1f };
-
 	newSkybox = Skybox("cube.obj");
 	newSkybox.setTexture(Skybox::Side::FRONT, "Town-skybox/Town_ft.bmp");
 	newSkybox.setTexture(Skybox::Side::BACK, "Town-skybox/Town_bk.bmp");
@@ -175,16 +169,16 @@ void update(void) {
 	if (keys[SDL_SCANCODE_A]) eye = moveRight(eye, r, -0.1f);
 	if (keys[SDL_SCANCODE_D]) eye = moveRight(eye, r, 0.1f);*/
 
-	if (keys[SDL_SCANCODE_W]) model.pos = moveForward(model.pos, model.rot.z, 0.1f);
-	if (keys[SDL_SCANCODE_S]) model.pos = moveForward(model.pos, model.rot.z, -0.1f);
-	if (keys[SDL_SCANCODE_A]) model.pos = moveRight(model.pos, model.rot.z, -0.1f);
-	if (keys[SDL_SCANCODE_D]) model.pos = moveRight(model.pos, model.rot.z, 0.1f);
+	if (keys[SDL_SCANCODE_W]) playerPos = moveForward(playerPos, rot, 0.1f);
+	if (keys[SDL_SCANCODE_S]) playerPos = moveForward(playerPos, rot, -0.1f);
+	if (keys[SDL_SCANCODE_A]) playerPos = moveRight(playerPos, rot, -0.1f);
+	if (keys[SDL_SCANCODE_D]) playerPos = moveRight(playerPos, rot, 0.1f);
 
-	if (keys[SDL_SCANCODE_R]) model.pos.y += 0.1;
-	if (keys[SDL_SCANCODE_F]) model.pos.y -= 0.1;
+	if (keys[SDL_SCANCODE_R]) playerPos.y += 0.1;
+	if (keys[SDL_SCANCODE_F]) playerPos.y -= 0.1;
 
-	if (keys[SDL_SCANCODE_COMMA]) model.rot.z -= 1.0f;
-	if (keys[SDL_SCANCODE_PERIOD]) model.rot.z += 1.0f;
+	if (keys[SDL_SCANCODE_COMMA]) rot -= 1.0f;
+	if (keys[SDL_SCANCODE_PERIOD]) rot += 1.0f;
 
 	if (keys[SDL_SCANCODE_1]) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -255,42 +249,13 @@ void draw(SDL_Window * window) {
 	glm::mat4 modelview(1.0); // set base position for scene
 	mvStack.push(modelview);
 
-	eye = model.pos;
-	at = model.pos;
-	eye = moveForward(at, model.rot.z, -6.0f);
+	eye = playerPos;
+	at = playerPos;
+	eye = moveForward(at, rot, -6.0f);
 	eye.y = at.y + 3.0f;
 	mvStack.top() = glm::lookAt(eye, at, up);
 
 	newSkybox.draw(skyboxProgram, projection, mvStack);
-
-	//// draw a skybox
-	//glUseProgram(skyboxProgram);
-	//rt3d::setUniformMatrix4fv(skyboxProgram, "projection", glm::value_ptr(projection));
-
-	//glDepthMask(GL_FALSE); // make sure depth test is off
-	//glm::mat3 mvRotOnlyMat3 = glm::mat3(mvStack.top());
-	//mvStack.push(glm::mat4(mvRotOnlyMat3));
-
-	//mvStack.push(mvStack.top());
-	//newSkybox.drawSide(skyboxProgram, Skybox::Side::FRONT, mvStack.top());
-	//mvStack.pop();
-
-	//mvStack.push(mvStack.top());
-	//newSkybox.drawSide(skyboxProgram, Skybox::Side::BACK, mvStack.top());
-	//mvStack.pop();
-
-	//mvStack.push(mvStack.top());
-	//newSkybox.drawSide(skyboxProgram, Skybox::Side::LEFT, mvStack.top());
-	//mvStack.pop();
-
-	//mvStack.push(mvStack.top());
-	//newSkybox.drawSide(skyboxProgram, Skybox::Side::RIGHT, mvStack.top());
-	//mvStack.pop();
-
-	//mvStack.pop();
-
-	//// back to remainder of rendering
-	//glDepthMask(GL_TRUE); // make sure depth test is on
 
 	glUseProgram(shaderProgram);
 
@@ -330,7 +295,7 @@ void draw(SDL_Window * window) {
 	mvStack.push(mvStack.top());
 	mvStack.top() = glm::translate(mvStack.top(), playerPos);
 	mvStack.top() = glm::rotate(mvStack.top(), float(90.0f*DEG_TO_RADIAN), glm::vec3(-1.0f, 0.0f, 0.0f));
-	mvStack.top() = glm::rotate(mvStack.top(), -float((r - 90)*DEG_TO_RADIAN), glm::vec3(0.0f, 0.0f, 1.0f));
+	mvStack.top() = glm::rotate(mvStack.top(), -float((rot - 90)*DEG_TO_RADIAN), glm::vec3(0.0f, 0.0f, 1.0f));
 	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(scale*0.05, scale*0.05, scale*0.05));
 	rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mvStack.top()));
 	rt3d::drawMesh(meshObjects[1], md2VertCount, GL_TRIANGLES);
@@ -338,11 +303,6 @@ void draw(SDL_Window * window) {
 	mvStack.pop();
 	glCullFace(GL_BACK);
 
-
-	//mvStack.push(mvStack.top());
-	//model.update();
-	//model.draw(shaderProgram, mvStack.top());
-	//mvStack.pop();
 
 
 
@@ -423,7 +383,6 @@ int main(int argc, char *argv[]) {
 		update();
 		draw(hWindow); // call the draw function
 	}
-
 	SDL_GL_DeleteContext(glContext);
 	SDL_DestroyWindow(hWindow);
 	SDL_Quit();
