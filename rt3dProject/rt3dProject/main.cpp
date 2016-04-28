@@ -52,19 +52,22 @@ glm::vec3 playerScale(0.05f, 0.05f, 0.05f);
 stack<glm::mat4> mvStack;
 
 // TEXTURE STUFF
-GLuint textures[5];
+GLuint textures[6];
 GLuint labels[5];
 
-rt3d::lightStruct light0 = {
-	{ 0.3f, 0.3f, 0.3f, 1.0f }, // ambient
+
+rt3d::lightStruct light = {
+	{ 0.75f, 0.75f, 0.75f, 1.0f }, // ambient
 	{ 1.0f, 1.0f, 1.0f, 1.0f }, // diffuse
 	{ 1.0f, 1.0f, 1.0f, 1.0f }, // specular
-	{ -10.0f, 10.0f, 10.0f, 1.0f }  // position
+	{ 0.0f, 5.0f, 0.0f, 1.0f }  // position
 };
-glm::vec4 lightPos(-10.0f, 10.0f, 10.0f, 1.0f); //light position
+glm::vec4 lightPos(0.0f, 5.0f, 0.0f, 1.0f); //light position
+
+
 
 rt3d::materialStruct material0 = {
-	{ 0.2f, 0.4f, 0.2f, 1.0f }, // ambient
+	{ 1.0f, 0.4f, 0.2f, 1.0f }, // ambient
 	{ 0.5f, 1.0f, 0.5f, 1.0f }, // diffuse
 	{ 0.0f, 0.1f, 0.0f, 1.0f }, // specular
 	2.0f  // shininess
@@ -88,6 +91,7 @@ HCHANNEL channel;
 Model ground[2];
 Model building[7];
 Model box;
+Model barrel;
 
 Skybox newSkybox;
 
@@ -134,7 +138,7 @@ HSAMPLE loadSample(char * filename) {
 void init(void) {
 	// For this simple example we'll be using the most basic of shader programs
 	shaderProgram = rt3d::initShaders("phong-tex.vert", "phong-tex.frag");
-	rt3d::setLight(shaderProgram, light0);
+	rt3d::setLight(shaderProgram, light);
 	rt3d::setMaterial(shaderProgram, material0);
 
 	skyboxProgram = rt3d::initShaders("textured.vert", "textured.frag");
@@ -157,6 +161,7 @@ void init(void) {
 	textures[3] = rt3d::loadBitmap("fence.bmp");
 
 	textures[4] = rt3d::loadBitmap("box.bmp");
+	textures[5] = rt3d::loadBitmap("barrel.bmp");
 
 	//ground
 	ground[0].pos = { 0.0f, 0.0f, 0.0f };
@@ -205,6 +210,9 @@ void init(void) {
 	box.scale = {1.0f, 1.0f, 1.0f};
 	box.texture = textures[4];
 
+	barrel.pos = { -10.0 ,2.0f, 10.0f };
+	barrel.scale = { 1.0f, 2.0f, 1.0f };
+	barrel.texture = textures[5];
 
 	newSkybox = Skybox("cube.obj");
 	newSkybox.setTexture(Skybox::Side::FRONT, "Town-skybox/Town_ft.bmp");
@@ -248,9 +256,28 @@ glm::vec3 moveRight(glm::vec3 pos, GLfloat angle, GLfloat d) {
 	return glm::vec3(pos.x + d*std::cos(angle*DEG_TO_RADIAN), pos.y, pos.z + d*std::sin(angle*DEG_TO_RADIAN));
 }
 
+void moveLight(float speed) {
+
+	bool backwardsX = false;
+	bool backwardsZ = false;
+	
+	if (lightPos.x >= 20)
+		lightPos.x = -20;
+
+	if (lightPos.z >= 20)
+		lightPos.z = -20;
+	
+	lightPos.x += speed;
+	lightPos.z += speed;
+
+}
+
 void update(void) {
 	const Uint8 *keys = SDL_GetKeyboardState(NULL);
 	oldPlayerPos = { playerPos.x,playerPos.y ,playerPos.z };
+
+	moveLight(0.25f);
+
 	if (keys[SDL_SCANCODE_W]) {
 		playerPos = moveForward(playerPos, rot, 0.3f);
 		currentAnim = 1;
@@ -300,6 +327,8 @@ void moveCollectable(glm::vec3 lastPos) {
 			}
 }
 
+
+
 //AABB Collision
 void checkCollision(glm::vec3 boxA, glm::vec3 scaleA, glm::vec3 boxB, glm::vec3 scaleB, bool collectable) {
 	glm::vec3 tmp(boxA.x, boxA.y - 1.0f, boxA.z);
@@ -325,6 +354,32 @@ GLuint textToTexture(const char * str, GLuint textID) {
 	TTF_Font * font = textFont;
 
 	SDL_Surface * stringImage = TTF_RenderText_Blended(font, str, { 255, 255, 255 });
+
+	if (stringImage == NULL) {
+		std::cout << "String surface not created." << std::endl;
+	}
+
+	if (texture == 0) {
+		glGenTextures(1, &texture);
+	}
+
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, stringImage->w, stringImage->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, stringImage->pixels);
+	glBindTexture(GL_TEXTURE_2D, NULL);
+
+	SDL_FreeSurface(stringImage);
+	return texture;
+}
+
+GLuint textToTexture(const char * str, GLuint textID, SDL_Color colour) {
+	GLuint texture = textID;
+	TTF_Font * font = textFont;
+
+	SDL_Surface * stringImage = TTF_RenderText_Blended(font, str, colour);
 
 	if (stringImage == NULL) {
 		std::cout << "String surface not created." << std::endl;
@@ -382,11 +437,10 @@ void draw(SDL_Window * window) {
 	glUseProgram(shaderProgram);
 
 	glm::vec4 tmp = mvStack.top()*lightPos;
-	light0.position[0] = tmp.x;
-	light0.position[1] = tmp.y;
-	light0.position[2] = tmp.z;
+	light.position[0] = tmp.x;
+	light.position[1] = tmp.y;
+	light.position[2] = tmp.z;
 	rt3d::setLightPos(shaderProgram, glm::value_ptr(tmp));
-
 
 	rt3d::setUniformMatrix4fv(shaderProgram, "projection", glm::value_ptr(projection));
 
@@ -446,6 +500,25 @@ void draw(SDL_Window * window) {
 	mvStack.pop();
 	checkCollision(playerPos, playerScale, box.pos, box.scale, true);
 
+
+	glBindTexture(GL_TEXTURE_2D, barrel.texture);
+	tmpMaterial = barrel.material;
+	rt3d::setMaterial(shaderProgram, barrel.material);
+
+	mvStack.push(mvStack.top());
+	mvStack.top() = glm::translate(mvStack.top(), barrel.pos);
+	mvStack.top() = glm::rotate(mvStack.top(), float((barrel.rot.x)* DEG_TO_RADIAN), glm::vec3(-1.0f, 0.0f, 0.0f));
+	mvStack.top() = glm::rotate(mvStack.top(), -float((barrel.rot.y)*DEG_TO_RADIAN), glm::vec3(0.0f, 1.0f, 0.0f));
+	mvStack.top() = glm::rotate(mvStack.top(), -float((barrel.rot.z)*DEG_TO_RADIAN), glm::vec3(0.0f, 0.0f, 1.0f));
+
+	mvStack.top() = glm::scale(mvStack.top(), barrel.scale);
+
+	rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mvStack.top()));
+	rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
+	mvStack.pop();
+	checkCollision(playerPos, playerScale, barrel.pos, barrel.scale, false);
+
+
 	// Animate the md2 model, and update the mesh with new vertex data
 	tmpModel.Animate(currentAnim, 0.1);
 	rt3d::updateMesh(meshObjects[1], RT3D_VERTEX, tmpModel.getAnimVerts(), tmpModel.getVertDataSize());
@@ -476,11 +549,11 @@ void draw(SDL_Window * window) {
 	////////////////////////////////////////////////////////////////////
 
 	glUseProgram(skyboxProgram);//Use texture-only shader for text rendering
-	labels[0] = textToTexture(" 3D label ", labels[0]);
+	labels[0] = textToTexture(" COLLECT THE BOXES ", labels[0], { 0,0,0});
 	glBindTexture(GL_TEXTURE_2D, labels[0]);
 	mvStack.push(mvStack.top());
-	mvStack.top() = glm::translate(mvStack.top(), glm::vec3(-1.0f, 2.0f, -7.0f));
-	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(1.0f, 1.0f, 0.0f));
+	mvStack.top() = glm::translate(mvStack.top(), glm::vec3(-3.0f, 3.0f, -7.0f));
+	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(6.0f, 3.0f, 0.0f));
 	rt3d::setUniformMatrix4fv(skyboxProgram, "modelview", glm::value_ptr(mvStack.top()));
 	rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
 	mvStack.pop();
