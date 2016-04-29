@@ -323,6 +323,14 @@ void update() {
 		currentAnim = 0;
 	}
 
+	if (keys[SDL_SCANCODE_COMMA]) {
+		rot -= 3.0f;
+	}
+	else
+		if (keys[SDL_SCANCODE_PERIOD]) {
+			rot += 3.0f;
+		}
+
 	if (keys[SDL_SCANCODE_1]) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glDisable(GL_CULL_FACE);
