@@ -40,14 +40,16 @@ GLuint shaderProgram;
 GLuint skyboxProgram;
 
 GLfloat rot = 0.0f;
+GLfloat playerRot = 0.0f;
+
 
 glm::vec3 eye(0.0f, 1.0f, 0.0f);
 glm::vec3 at(0.0f, 1.0f, -1.0f);
 glm::vec3 up(0.0f, 1.0f, 0.0f);
 
-glm::vec3 playerPos(0.0f, 1.0f, 0.0f);
-glm::vec3 oldPlayerPos(0.0f, 1.0f, 0.0f);
-glm::vec3 playerScale(0.05f, 0.05f, 0.05f);
+glm::vec3 playerPos(0.0f, 2.0f, 0.0f);
+glm::vec3 oldPlayerPos(0.0f, 2.0f, 0.0f);
+glm::vec3 playerScale(0.72f, 0.72f, 0.72f);
 
 stack<glm::mat4> mvStack;
 
@@ -84,6 +86,7 @@ md2model tmpModel;
 int currentAnim = 0;
 
 int score = 0;
+int jumpingAnimCooldown = 0;
 
 HSAMPLE sample;
 HCHANNEL channel;
@@ -94,10 +97,13 @@ Model box;
 Model barrel;
 
 Skybox newSkybox;
+SDL_Window * window;
+
+int mouseX, mouseY;
 
 // Set up rendering context
 SDL_Window * setupRC(SDL_GLContext &context) {
-	SDL_Window * window;
+	
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) // Initialize video
 		rt3d::exitFatalError("Unable to initialize SDL");
 
@@ -137,6 +143,7 @@ HSAMPLE loadSample(char * filename) {
 
 void init(void) {
 	// For this simple example we'll be using the most basic of shader programs
+	SDL_ShowCursor(SDL_DISABLE);
 	shaderProgram = rt3d::initShaders("phong-tex.vert", "phong-tex.frag");
 	rt3d::setLight(shaderProgram, light);
 	rt3d::setMaterial(shaderProgram, material0);
@@ -172,11 +179,12 @@ void init(void) {
 	ground[1].scale = { 20.0f,0.2f,10.0f };
 	ground[1].texture = textures[0];
 
-	//front
+	//front left
 	building[0].pos = { -10.0f, 2.0f, -21.0f };
 	building[0].scale = { 10.0f, 2.0f, 1.0f };
 	building[0].texture = textures[2];
 
+	//front right
 	building[1].pos = { 10.0f, 2.5f, -21.0f };
 	building[1].scale = { 10.0f, 2.5f, 1.0f };
 	building[1].texture = textures[2];
@@ -202,18 +210,21 @@ void init(void) {
 	building[5].texture = textures[2];
 
 	//right end wall
-	building[6].pos = { 60.0f, 5.0f, 10.0f };
-	building[6].scale = { 1.0f, 5.0f, 10.0f };
+	building[6].pos = { 63.0f, 5.0f, 10.0f };
+	building[6].scale = { 3.0f, 5.0f, 10.0f };
 	building[6].texture = textures[2];
 
+	//Set initial box position and scale
 	box.pos = { 2.0f,1.0f,2.0f };
 	box.scale = {1.0f, 1.0f, 1.0f};
 	box.texture = textures[4];
 
+	//Set barrel position
 	barrel.pos = { -10.0 ,2.0f, 10.0f };
 	barrel.scale = { 1.0f, 2.0f, 1.0f };
 	barrel.texture = textures[5];
 
+	//Load in mesh for skybox and set texture for each side
 	newSkybox = Skybox("cube.obj");
 	newSkybox.setTexture(Skybox::Side::FRONT, "Town-skybox/Town_ft.bmp");
 	newSkybox.setTexture(Skybox::Side::BACK, "Town-skybox/Town_bk.bmp");
@@ -234,7 +245,7 @@ void init(void) {
 		cout << "Failed to open font." << endl;
 
 	labels[0] = 0;
-
+	//Initialise BASS
 	if (!BASS_Init(-1, 44100, 0, 0, NULL))
 		cout << "Can't initialize device";
 
@@ -242,9 +253,9 @@ void init(void) {
 
 	channel = BASS_SampleGetChannel(sample, FALSE);
 	BASS_ChannelSetAttribute(channel, BASS_ATTRIB_FREQ, 0);
-	BASS_ChannelSetAttribute(channel, BASS_ATTRIB_VOL, 0.5);
+	BASS_ChannelSetAttribute(channel, BASS_ATTRIB_VOL, 0.75);
 	BASS_ChannelSetAttribute(channel, BASS_ATTRIB_PAN, -1);
-	BASS_ChannelPlay(channel, FALSE);
+	BASS_ChannelPlay(channel, TRUE);
 }
 
 
@@ -257,7 +268,6 @@ glm::vec3 moveRight(glm::vec3 pos, GLfloat angle, GLfloat d) {
 }
 
 void moveLight(float speed) {
-
 	bool backwardsX = false;
 	bool backwardsZ = false;
 	
@@ -269,31 +279,49 @@ void moveLight(float speed) {
 	
 	lightPos.x += speed;
 	lightPos.z += speed;
-
 }
 
-void update(void) {
+void update() {
 	const Uint8 *keys = SDL_GetKeyboardState(NULL);
 	oldPlayerPos = { playerPos.x,playerPos.y ,playerPos.z };
 
 	moveLight(0.25f);
 
+	//MouseRotation
+	SDL_GetMouseState(&mouseX, &mouseY);
+	SDL_WarpMouseInWindow(window, 400, 300);
+	SDL_SetWindowGrab(window, SDL_TRUE);
+	if (mouseX > 401) {
+		rot += 3.0f;
+	}
+	if (mouseX < 399) {
+		rot -= 3.0f;
+	}
+
+	//Animation
 	if (keys[SDL_SCANCODE_W]) {
 		playerPos = moveForward(playerPos, rot, 0.3f);
-		currentAnim = 1;
+		if (jumpingAnimCooldown < 1)
+			currentAnim = 1;
 	}
-	else
+	else if (keys[SDL_SCANCODE_S]) {
+		playerPos = moveForward(playerPos, rot, -0.3f);
+		if (jumpingAnimCooldown < 1)
+			currentAnim = 1;
+	}
+	else if (keys[SDL_SCANCODE_A]) {
+		playerPos = moveRight(playerPos, rot, -0.3f);
+		if (jumpingAnimCooldown < 1)
+			currentAnim = 1;
+	}
+	else if (keys[SDL_SCANCODE_D]) {
+		playerPos = moveRight(playerPos, rot, 0.3f);
+		if (jumpingAnimCooldown < 1)
+			currentAnim = 1;
+	}
+	else if (jumpingAnimCooldown < 1) {
 		currentAnim = 0;
-
-	if (keys[SDL_SCANCODE_S]) playerPos = moveForward(playerPos, rot, -0.3f);
-	if (keys[SDL_SCANCODE_A]) playerPos = moveRight(playerPos, rot, -0.3f);
-	if (keys[SDL_SCANCODE_D]) playerPos = moveRight(playerPos, rot, 0.3f);
-
-	if (keys[SDL_SCANCODE_R]) playerPos.y += 0.1;
-	if (keys[SDL_SCANCODE_F]) playerPos.y -= 0.1;
-
-	if (keys[SDL_SCANCODE_COMMA]) rot -= 1.0f;
-	if (keys[SDL_SCANCODE_PERIOD]) rot += 1.0f;
+	}
 
 	if (keys[SDL_SCANCODE_1]) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -303,14 +331,15 @@ void update(void) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glEnable(GL_CULL_FACE);
 	}
-	if (keys[SDL_SCANCODE_Z]) {
-		if (--currentAnim < 0) currentAnim = 19;
-		cout << "Current animation: " << currentAnim << endl;
+
+	//Score Reset
+	if (score > 10) {
+		score = 0;
+		currentAnim = 7;
+		jumpingAnimCooldown = 100;
 	}
-	if (keys[SDL_SCANCODE_X]) {
-		if (++currentAnim >= 20) currentAnim = 0;
-		cout << "Current animation: " << currentAnim << endl;
-	}
+
+	jumpingAnimCooldown--;
 }
 
 void moveCollectable(glm::vec3 lastPos) {
@@ -326,8 +355,6 @@ void moveCollectable(glm::vec3 lastPos) {
 				box.pos = { 2.0f, 1.0f, 2.0f };
 			}
 }
-
-
 
 //AABB Collision
 void checkCollision(glm::vec3 boxA, glm::vec3 scaleA, glm::vec3 boxB, glm::vec3 scaleB, bool collectable) {
@@ -375,11 +402,11 @@ GLuint textToTexture(const char * str, GLuint textID) {
 	return texture;
 }
 
-GLuint textToTexture(const char * str, GLuint textID, SDL_Color colour) {
+GLuint textToTexture(const string str, GLuint textID, SDL_Color colour) {
 	GLuint texture = textID;
 	TTF_Font * font = textFont;
-
-	SDL_Surface * stringImage = TTF_RenderText_Blended(font, str, colour);
+	const char* text = str.c_str();
+	SDL_Surface * stringImage = TTF_RenderText_Blended(font, text, colour);
 
 	if (stringImage == NULL) {
 		std::cout << "String surface not created." << std::endl;
@@ -409,7 +436,6 @@ void clearTextTexture(GLuint textID) {
 
 
 void draw(SDL_Window * window) {
-
 	// clear the screen
 	glEnable(GL_CULL_FACE);
 	glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
@@ -424,14 +450,14 @@ void draw(SDL_Window * window) {
 	glm::mat4 modelview(1.0); // set base position for scene
 	mvStack.push(modelview);
 
-	
-
+	//Set the camera behind the player
 	eye = playerPos;
 	at = playerPos;
 	eye = moveForward(at, rot, -6.0f);
 	eye.y = at.y + 3.0f;
 	mvStack.top() = glm::lookAt(eye, at, up);
 
+	//Draw the skybox
 	newSkybox.draw(skyboxProgram, projection, mvStack);
 
 	glUseProgram(shaderProgram);
@@ -444,6 +470,7 @@ void draw(SDL_Window * window) {
 
 	rt3d::setUniformMatrix4fv(shaderProgram, "projection", glm::value_ptr(projection));
 
+	//Draw the ground meshes
 	for (int i = 0; i < 2; i++) {
 		glBindTexture(GL_TEXTURE_2D, ground[i].texture);
 		rt3d::materialStruct tmpMaterial = ground[i].material;
@@ -460,62 +487,56 @@ void draw(SDL_Window * window) {
 		rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mvStack.top()));
 		rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
 		mvStack.pop();
-
 	}
 
+	//Draw all the buildings
 	for (int i = 0; i < 10; i++) {
 		glBindTexture(GL_TEXTURE_2D, building[i].texture);
 		rt3d::materialStruct tmpMaterial = building[i].material;
 		rt3d::setMaterial(shaderProgram, building[i].material);
-
 		mvStack.push(mvStack.top());
 		mvStack.top() = glm::translate(mvStack.top(), building[i].pos);
 		mvStack.top() = glm::rotate(mvStack.top(), float(building[i].rot.x * DEG_TO_RADIAN), glm::vec3(-1.0f, 0.0f, 0.0f));
 		mvStack.top() = glm::rotate(mvStack.top(), -float((building[i].rot.y)*DEG_TO_RADIAN), glm::vec3(0.0f, 1.0f, 0.0f));
 		mvStack.top() = glm::rotate(mvStack.top(), -float((building[i].rot.z)*DEG_TO_RADIAN), glm::vec3(0.0f, 0.0f, 1.0f));
-
 		mvStack.top() = glm::scale(mvStack.top(), building[i].scale);
-
 		rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mvStack.top()));
 		rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
 		mvStack.pop();
-
+		//check for collision with the buildings
 		checkCollision(playerPos, playerScale, building[i].pos, building[i].scale, false);
 	}
 
+	//Draw the collectable box
 	glBindTexture(GL_TEXTURE_2D, box.texture);
 	rt3d::materialStruct tmpMaterial = box.material;
 	rt3d::setMaterial(shaderProgram, box.material);
-
 	mvStack.push(mvStack.top());
 	mvStack.top() = glm::translate(mvStack.top(), box.pos);
 	mvStack.top() = glm::rotate(mvStack.top(), float((box.rot.x)* DEG_TO_RADIAN), glm::vec3(-1.0f, 0.0f, 0.0f));
 	mvStack.top() = glm::rotate(mvStack.top(), -float((box.rot.y += 0.5f)*DEG_TO_RADIAN), glm::vec3(0.0f, 1.0f, 0.0f));
 	mvStack.top() = glm::rotate(mvStack.top(), -float((box.rot.z)*DEG_TO_RADIAN), glm::vec3(0.0f, 0.0f, 1.0f));
-
 	mvStack.top() = glm::scale(mvStack.top(), box.scale);
-
 	rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mvStack.top()));
 	rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
 	mvStack.pop();
+	//check for collision with the collectable box
 	checkCollision(playerPos, playerScale, box.pos, box.scale, true);
 
-
+	//Draw the barrel
 	glBindTexture(GL_TEXTURE_2D, barrel.texture);
 	tmpMaterial = barrel.material;
 	rt3d::setMaterial(shaderProgram, barrel.material);
-
 	mvStack.push(mvStack.top());
 	mvStack.top() = glm::translate(mvStack.top(), barrel.pos);
 	mvStack.top() = glm::rotate(mvStack.top(), float((barrel.rot.x)* DEG_TO_RADIAN), glm::vec3(-1.0f, 0.0f, 0.0f));
 	mvStack.top() = glm::rotate(mvStack.top(), -float((barrel.rot.y)*DEG_TO_RADIAN), glm::vec3(0.0f, 1.0f, 0.0f));
 	mvStack.top() = glm::rotate(mvStack.top(), -float((barrel.rot.z)*DEG_TO_RADIAN), glm::vec3(0.0f, 0.0f, 1.0f));
-
 	mvStack.top() = glm::scale(mvStack.top(), barrel.scale);
-
 	rt3d::setUniformMatrix4fv(shaderProgram, "modelview", glm::value_ptr(mvStack.top()));
 	rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
 	mvStack.pop();
+	//check for collision with the barrel
 	checkCollision(playerPos, playerScale, barrel.pos, barrel.scale, false);
 
 
@@ -540,25 +561,19 @@ void draw(SDL_Window * window) {
 	mvStack.pop();
 	glCullFace(GL_BACK);
 
-
-
-
-
 	////////////////////////////////////////////////////////////////////
 	//This renders a 3D label
 	////////////////////////////////////////////////////////////////////
 
 	glUseProgram(skyboxProgram);//Use texture-only shader for text rendering
-	labels[0] = textToTexture(" COLLECT THE BOXES ", labels[0], { 0,0,0});
+	labels[0] = textToTexture(" COLLECT THE BOXES ", labels[0], { 0,0,0 });
 	glBindTexture(GL_TEXTURE_2D, labels[0]);
 	mvStack.push(mvStack.top());
-	mvStack.top() = glm::translate(mvStack.top(), glm::vec3(-3.0f, 3.0f, -7.0f));
+	mvStack.top() = glm::translate(mvStack.top(), glm::vec3(6.0f, 3.0f, -19.5f));
 	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(6.0f, 3.0f, 0.0f));
 	rt3d::setUniformMatrix4fv(skyboxProgram, "modelview", glm::value_ptr(mvStack.top()));
 	rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
 	mvStack.pop();
-
-
 
 	////////////////////////////////////////////////////////////////////
 	//This renders a HUD label
@@ -567,18 +582,17 @@ void draw(SDL_Window * window) {
 	glUseProgram(skyboxProgram);//Use texture-only shader for text rendering
 	glDisable(GL_DEPTH_TEST);//Disable depth test for HUD label
 
-	for (int i = 0; i < score; i++) {
-		//labels[0] = textToTexture(" HUD label ", labels[0]);
-		glBindTexture(GL_TEXTURE_2D, textures[4]);
-		mvStack.push(glm::mat4(1.0));
-		mvStack.top() = glm::translate(mvStack.top(), glm::vec3(-0.9f +(i*0.1f), -0.9f, 0.0f));
-		mvStack.top() = glm::scale(mvStack.top(), glm::vec3(0.05f, 0.05f, 0.0f));
-		rt3d::setUniformMatrix4fv(skyboxProgram, "projection", glm::value_ptr(glm::mat4(1.0)));
-		rt3d::setUniformMatrix4fv(skyboxProgram, "modelview", glm::value_ptr(mvStack.top()));
+	labels[0] = textToTexture("SCORE: " + std::to_string(score), labels[0], { 255,255,0 });
+	glBindTexture(GL_TEXTURE_2D, labels[0]);
+	mvStack.push(glm::mat4(1.0));
+	mvStack.top() = glm::translate(mvStack.top(), glm::vec3(-0.7f, 0.7f, 0.0f));
+	mvStack.top() = glm::scale(mvStack.top(), glm::vec3(0.25f, 0.25f, 0.0f));
+	rt3d::setUniformMatrix4fv(skyboxProgram, "projection", glm::value_ptr(glm::mat4(1.0)));
+	rt3d::setUniformMatrix4fv(skyboxProgram, "modelview", glm::value_ptr(mvStack.top()));
 
-		rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
-		mvStack.pop();
-	}
+	rt3d::drawIndexedMesh(meshObjects[0], meshIndexCount, GL_TRIANGLES);
+	mvStack.pop();
+
 	glEnable(GL_DEPTH_TEST);//Re-enable depth test after HUD label 
 
 	mvStack.pop(); // initial matrix

@@ -22,7 +22,7 @@ public:
 
 	void setTexture(Side side, char* fileName);
 
-	void draw(GLuint shaderProgram, glm::mat4 projection, ::stack<glm::mat4>& mvStack);
+	void draw(GLuint shaderProgram, glm::mat4 projection, stack<glm::mat4>& mvStack);
 
 private:
 
